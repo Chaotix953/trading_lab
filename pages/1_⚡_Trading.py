@@ -260,7 +260,7 @@ try:
                     st.rerun()
 
         elif asset_class == "Options Chain":
-            st.info("📋 Options Chain — analyze and simulate")
+            st.info("📋 Options Chain — analyze and trade with Black-Scholes pricing")
             try:
                 expirations = fetch_options_expirations(ticker_input)
                 if expirations:
@@ -268,14 +268,120 @@ try:
                     calls_df, puts_df = fetch_options_chain(ticker_input, expiry)
                     opt_type = st.radio("Type", ["Calls", "Puts"], horizontal=True)
                     df_opt = calls_df if opt_type == "Calls" else puts_df
+                    
+                    # Filtrer autour du prix actuel
                     df_filtered = df_opt[
                         (df_opt["strike"] > current_price * 0.85) &
                         (df_opt["strike"] < current_price * 1.15)
                     ]
+                    
                     display_cols = ["contractSymbol", "strike", "lastPrice", "bid", "ask",
                                     "volume", "openInterest", "impliedVolatility"]
                     available = [c for c in display_cols if c in df_filtered.columns]
                     st.dataframe(df_filtered[available], use_container_width=True)
+                    
+                    # ── Options Analysis & Trading ───────────────────────────
+                    st.markdown("---")
+                    st.write("### 🧮 Analyse & Trading d'Options")
+                    
+                    col_analysis, col_trade = st.columns(2)
+                    
+                    with col_analysis:
+                        st.write("#### 📊 Analyse Black-Scholes")
+                        selected_strike = st.selectbox(
+                            "Sélectionner Strike", 
+                            sorted(df_filtered['strike'].unique()),
+                            key="opt_strike"
+                        )
+                        
+                        # Récupérer les données de l'option
+                        opt_data = df_filtered[df_filtered['strike'] == selected_strike].iloc[0]
+                        
+                        # Calcul du temps jusqu'à l'expiration
+                        from datetime import datetime as dt
+                        T = (dt.strptime(expiry, "%Y-%m-%d") - dt.now()).days / 365.0
+                        
+                        if T > 0:
+                            # Import et calcul Black-Scholes
+                            from lib.options_pricing import OptionCalculator
+                            
+                            bs = OptionCalculator(
+                                S=current_price,
+                                K=selected_strike,
+                                T=T,
+                                r=0.045,  # Taux sans risque approximé
+                                sigma=opt_data.get('impliedVolatility', 0.2),
+                                option_type=opt_type.lower()[:-1]  # "call" ou "put"
+                            )
+                            
+                            theo_price = bs.price()
+                            greeks = bs.greeks()
+                            intrinsic = bs.intrinsic_value()
+                            time_value = bs.time_value()
+                            
+                            # Affichage
+                            st.metric(
+                                "Prix Théorique (BS)",
+                                f"${theo_price:.2f}",
+                                delta=f"Marché: ${opt_data['lastPrice']:.2f}"
+                            )
+                            
+                            st.write("**Greeks:**")
+                            gc1, gc2, gc3, gc4 = st.columns(4)
+                            with gc1:
+                                st.metric("Δ (Delta)", greeks['Delta'])
+                            with gc2:
+                                st.metric("Γ (Gamma)", greeks['Gamma'])
+                            with gc3:
+                                st.metric("Θ (Theta)", greeks['Theta'])
+                            with gc4:
+                                st.metric("ν (Vega)", greeks['Vega'])
+                            
+                            st.caption(f"Intrinsic: ${intrinsic:.2f} | Time Value: ${time_value:.2f}")
+                    
+                    with col_trade:
+                        st.write("#### 💼 Passer un Ordre d'Option")
+                        
+                        opt_qty = st.number_input(
+                            "Nombre de Contrats",
+                            min_value=1,
+                            value=1,
+                            step=1,
+                            key="opt_qty"
+                        )
+                        
+                        opt_action = st.selectbox(
+                            "Action",
+                            ["Buy", "Sell (Close)"],
+                            key="opt_action"
+                        )
+                        
+                        trade_price = opt_data['lastPrice']
+                        total_cost = opt_qty * trade_price * 100
+                        
+                        st.info(f"**Coût Total:** ${total_cost:,.2f}")
+                        st.caption(f"Prix unitaire: ${trade_price:.2f} | 100 actions par contrat")
+                        
+                        if st.button("🚀 Exécuter Ordre Option", use_container_width=True, type="primary"):
+                            # Métadonnées cruciales pour le portefeuille
+                            meta = {
+                                "strike": float(selected_strike),
+                                "expiry": expiry,
+                                "type": opt_type.lower()[:-1],  # "call" ou "put"
+                                "multiplier": 100
+                            }
+                            
+                            success = execute_trade(
+                                ticker=ticker_input,
+                                action=opt_action,
+                                quantity=opt_qty,
+                                raw_price=trade_price,
+                                asset_type="Option",
+                                option_metadata=meta
+                            )
+                            
+                            if success:
+                                st.rerun()
                 else:
                     st.warning("No options available for this ticker.")
             except Exception as e:

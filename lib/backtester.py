@@ -145,62 +145,78 @@ def run_backtest(
     trades = []
 
     for i in range(len(df)):
-        price = df["Close"].iloc[i]
+        close_price = df["Close"].iloc[i]
         date = df.index[i]
+        
+        # Intra-bar OHLC pour éviter le Look-Ahead Bias
+        current_high = df["High"].iloc[i]
+        current_low = df["Low"].iloc[i]
+        open_price = df["Open"].iloc[i]
 
         # Check SL / TP if in position
         if position > 0:
-            if stop_loss_pct and price <= entry_price * (1 - stop_loss_pct / 100):
-                # Stop-loss triggered
-                revenue = position * price * (1 - commission_rate)
-                pnl = revenue - (position * entry_price)
-                cash += revenue
-                trades.append({
-                    "date": str(date), "action": "Sell (SL)", "price": price,
-                    "qty": position, "pnl": round(pnl, 2),
-                })
-                position = 0
-                entry_price = 0
-            elif take_profit_pct and price >= entry_price * (1 + take_profit_pct / 100):
-                # Take-profit triggered
-                revenue = position * price * (1 - commission_rate)
-                pnl = revenue - (position * entry_price)
-                cash += revenue
-                trades.append({
-                    "date": str(date), "action": "Sell (TP)", "price": price,
-                    "qty": position, "pnl": round(pnl, 2),
-                })
-                position = 0
-                entry_price = 0
+            # Stop Loss : On vérifie si le PLUS BAS a touché le stop
+            if stop_loss_pct:
+                sl_price = entry_price * (1 - stop_loss_pct / 100)
+                if current_low <= sl_price:
+                    # On est sorti au pire des cas : au prix du SL (ou Open si gap baissier)
+                    exit_price = min(open_price, sl_price) if i > 0 else sl_price
+                    revenue = position * exit_price * (1 - commission_rate)
+                    pnl = revenue - (position * entry_price)
+                    cash += revenue
+                    trades.append({
+                        "date": str(date), "action": "Sell (SL)", "price": exit_price,
+                        "qty": position, "pnl": round(pnl, 2),
+                    })
+                    position = 0
+                    entry_price = 0
+                    equity.append(cash)
+                    continue
+
+            # Take Profit : On vérifie si le PLUS HAUT a touché la cible
+            if take_profit_pct and position > 0:
+                tp_price = entry_price * (1 + take_profit_pct / 100)
+                if current_high >= tp_price:
+                    revenue = position * tp_price * (1 - commission_rate)
+                    pnl = revenue - (position * entry_price)
+                    cash += revenue
+                    trades.append({
+                        "date": str(date), "action": "Sell (TP)", "price": tp_price,
+                        "qty": position, "pnl": round(pnl, 2),
+                    })
+                    position = 0
+                    entry_price = 0
+                    equity.append(cash)
+                    continue
 
         sig = signals.iloc[i]
 
         # Buy signal, no position
         if sig == 1 and position == 0:
             invest = cash * (position_size_pct / 100)
-            qty = int(invest / price)
+            qty = int(invest / open_price)
             if qty > 0:
-                cost = qty * price * (1 + commission_rate)
+                cost = qty * open_price * (1 + commission_rate)
                 cash -= cost
                 position = qty
-                entry_price = price
+                entry_price = open_price
                 trades.append({
-                    "date": str(date), "action": "Buy", "price": price, "qty": qty, "pnl": 0,
+                    "date": str(date), "action": "Buy", "price": open_price, "qty": qty, "pnl": 0,
                 })
 
         # Sell signal, has position
         elif sig == -1 and position > 0:
-            revenue = position * price * (1 - commission_rate)
+            revenue = position * close_price * (1 - commission_rate)
             pnl = revenue - (position * entry_price)
             cash += revenue
             trades.append({
-                "date": str(date), "action": "Sell", "price": price,
+                "date": str(date), "action": "Sell", "price": close_price,
                 "qty": position, "pnl": round(pnl, 2),
             })
             position = 0
             entry_price = 0
 
-        equity.append(cash + position * price)
+        equity.append(cash + position * close_price)
 
     # Close any open position at end
     if position > 0:

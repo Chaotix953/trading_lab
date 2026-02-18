@@ -25,17 +25,30 @@ def fetch_info(ticker: str) -> dict:
     return yf.Ticker(ticker).info
 
 
-def get_current_price(ticker: str) -> float | None:
-    """Best-effort current price for *ticker*."""
+@st.cache_data(ttl=60)  # Cache réduit à 60 secondes pour le temps réel
+def get_current_price(ticker: str) -> float:
+    """Récupère le tout dernier prix disponible (intraday).
+    
+    Stratégie:
+    1. Essaye 1 jour avec interval 1 minute pour la dernière bougie
+    2. Fallback à 5 jours si le marché est fermé
+    3. Retourne 0.0 en cas d'erreur
+    """
     try:
-        info = fetch_info(ticker)
-        p = info.get("currentPrice") or info.get("regularMarketPrice")
-        if p:
-            return float(p)
-        h = fetch_history(ticker, period="1d", interval="1d")
-        return float(h["Close"].iloc[-1]) if not h.empty else None
-    except Exception:
-        return None
+        dat = yf.Ticker(ticker)
+        # On force 1 jour, intervalle 1 minute pour avoir la dernière bougie
+        df = dat.history(period="1d", interval="1m")
+        if not df.empty:
+            return float(df["Close"].iloc[-1])
+        
+        # Fallback si marché fermé ou pas de données minute
+        df_day = dat.history(period="5d")
+        if not df_day.empty:
+            return float(df_day["Close"].iloc[-1])
+        return 0.0
+    except Exception as e:
+        print(f"Erreur fetch {ticker}: {e}")
+        return 0.0
 
 
 @st.cache_data(ttl=30, show_spinner=False)
