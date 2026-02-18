@@ -1,0 +1,37 @@
+name: Déploiement Trading Lab 🚀
+run-name: ${{ gitea.actor }} met à jour le bot 🤖
+on:
+  push:
+    branches:
+      - main  # Se déclenche UNIQUEMENT sur la branche main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📢 Démarrage
+        run: echo "Déploiement initié..."
+
+      - name: 🚀 Connexion SSH et Mise à jour
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          script: |
+            # 1. Aller dans le dossier du code source (sur le Pi)
+            cd ~/mon-serveur/trading-lab
+            
+            # 2. Récupérer le dernier code depuis Gitea
+            # (Assurez-vous que git est configuré pour pull sans mot de passe, sinon voir note ci-dessous*)
+            git pull origin main
+            
+            # 3. Revenir à la racine pour Docker Compose
+            cd ~/mon-serveur
+            
+            # 4. Reconstruire SEULEMENT le conteneur de trading
+            docker compose up -d --build trading-lab-pro
+            
+            # 5. Nettoyer les vieilles images (pour sauver la carte SD)
+            docker image prune -f
