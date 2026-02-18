@@ -13,12 +13,15 @@ A full-featured paper trading platform built with Streamlit and yfinance. Design
 ## ✨ Features
 
 ### 📊 Trading
-- **Market orders** with realistic slippage and bid-ask spread simulation
+- **Market orders** with realistic Gaussian slippage and bid-ask spread simulation
 - **Limit / Stop orders** — Limit Buy, Limit Sell, Stop-Loss, Take-Profit
 - **Trailing Stop** — percentage-based or fixed-dollar trailing
 - **OCO Bracket orders** — linked Stop-Loss + Take-Profit (one triggers, other cancels)
 - **Short Selling** with margin tracking and margin call warnings
-- **Options Chain** viewer with strike filtering
+- **Options Trading** — Full support with Black-Scholes pricing, Greeks (Δ, Γ, Θ, ν, ρ)
+- **Options Chain** viewer with strike filtering and volatility analysis
+- **Real-time data** — Intraday minute-level pricing with optimized yfinance calls
+- **Decimal Precision** — 28-digit financial accuracy to eliminate rounding errors
 - **Commission simulation** — configurable per-trade costs
 - **Trade notes & tagging** — annotate every trade for journaling
 
@@ -49,6 +52,11 @@ Plus: **Support/Resistance detection**, **Fibonacci retracement**, **Pivot Point
 - **5 built-in strategies**: SMA Crossover, RSI Mean Reversion, MACD Cross, Bollinger Bounce, Combined Momentum
 - Configurable parameters for each strategy
 - Optional Stop-Loss / Take-Profit in backtest
+- **Intra-bar execution** — Eliminates Look-Ahead Bias using OHLC data correctly
+  - Entry orders executed on Open price
+  - Stop-Loss triggered on Low price
+  - Take-Profit triggered on High price
+  - Exit orders at Close price
 - **Strategy comparison mode** — test all strategies on the same data
 - Visual trade markers on equity curve
 - Alpha vs Buy & Hold calculation
@@ -132,12 +140,13 @@ trading-lab-pro/
 │   ├── config.py                   # Constants & defaults
 │   ├── state.py                    # Session state management
 │   ├── data_fetcher.py             # Market data (yfinance wrapper)
-│   ├── trading_engine.py           # Order execution engine
+│   ├── trading_engine.py           # Order execution engine (Decimal-based)
 │   ├── orders.py                   # Pending order management
 │   ├── indicators.py               # 20+ technical indicators
 │   ├── performance.py              # Performance analytics
-│   ├── backtester.py               # Backtesting engine
+│   ├── backtester.py               # Backtesting engine (no Look-Ahead Bias)
 │   ├── scanner.py                  # Market scanner & alerts
+│   ├── options_pricing.py          # Black-Scholes option pricing & Greeks
 │   ├── charts.py                   # Plotly chart factories
 │   └── styles.py                   # CSS styling
 ├── data/                           # Local saves & backups
@@ -173,11 +182,33 @@ trading-lab-pro/
 - **Crypto**: BTC-USD, ETH-USD, SOL-USD, etc.
 - **Forex**: EURUSD=X, GBPUSD=X, USDJPY=X, etc.
 - **ETFs**: SPY, QQQ, IWM, etc.
-- **Options chains**: Available for optionable tickers
+- **Options chains**: Full support with Black-Scholes pricing and Greeks
 
 ---
 
-## ⚙️ Configuration
+## 🎓 Advanced Features
+
+### Options Pricing & Analysis
+- **Black-Scholes Model** — Academic-grade option pricing
+- **Greeks Calculation**:
+  - **Delta (Δ)** — Price sensitivity (0-1 for calls, -1-0 for puts)
+  - **Gamma (Γ)** — Delta acceleration and risk concentration
+  - **Theta (Θ)** — Daily time decay per percentage point
+  - **Vega (ν)** — Volatility sensitivity (per 1% change)
+  - **Rho (ρ)** — Interest rate sensitivity (per 1% change)
+- **Intrinsic vs Time Value** — Understand option decomposition
+- **Implied Volatility display** — From market data
+- **Real-time option chain** with strike filtering (±15% around spot)
+
+### Financial Precision
+- **Decimal Arithmetic** — 28-digit precision eliminates floating-point errors
+- **Realistic Slippage** — Gaussian distribution N(0, 0.05%) simulates market microstructure
+- **Market Impact** — Fill prices reflect realistic bid-ask dynamics
+- **Margin Calculation** — 50% requirement for short selling
+
+---
+
+## Supported Instruments
 
 ### Simulation Realism
 | Parameter | Default | Description |
@@ -203,7 +234,8 @@ Contributions are welcome! Here are some areas where help is appreciated:
 
 - [ ] Market replay mode (bar-by-bar historical replay)
 - [ ] Additional strategies for backtester
-- [ ] Options pricing calculator (Black-Scholes, Greeks)
+- [ ] Stochastic volatility models (Heston, SABR)
+- [ ] Monte Carlo option pricing alternative to Black-Scholes
 - [ ] Multi-account support
 - [ ] More data sources (alternatives to yfinance)
 - [ ] Unit tests
