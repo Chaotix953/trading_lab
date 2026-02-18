@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  trading-lab-pro:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: trading-lab-pro:latest
+    container_name: trading-lab-pro
+    ports:
+      - "8501:8501"
+    volumes:
+      # Persist data directory
+      - trading_data:/app/data
+      # Persist Streamlit cache
+      - streamlit_cache:/app/.streamlit/cache
+    environment:
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+      - STREAMLIT_SERVER_HEADLESS=true
+      - STREAMLIT_CLIENT_SHOW_ERROR_DETAILS=true
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    # Optional: Add resource limits
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '2'
+    #       memory: 2G
+    #     reservations:
+    #       cpus: '1'
+    #       memory: 1G
+
+volumes:
+  trading_data:
+    driver: local
+  streamlit_cache:
+    driver: local
+
+# Usage:
+# docker-compose up -d              # Start the app
+# docker-compose logs -f            # View logs
+# docker-compose down               # Stop and remove containers
+# docker-compose down -v            # Stop and remove containers + volumes

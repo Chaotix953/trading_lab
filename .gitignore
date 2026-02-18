@@ -33,8 +33,19 @@ data/*.json
 
 # Streamlit
 .streamlit/secrets.toml
+.streamlit/cache/
 
 # Testing
 .coverage
 htmlcov/
 .pytest_cache/
+
+# Docker
+.docker/
+docker-compose.override.yml
+*.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
