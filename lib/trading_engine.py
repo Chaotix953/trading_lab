@@ -317,29 +317,32 @@ def get_portfolio_value(current_prices: Optional[Dict[str, float]] = None) -> fl
     return total
 
 
-def get_margin_usage() -> Dict[str, float]:
+def get_margin_usage() -> Dict[str, Any]:
     """
     Calcule l'utilisation du margin (pour le short selling).
     
     Returns:
     --------
-    dict : {"margin_used": float, "margin_available": float, "margin_utilization_pct": float}
+    dict : {"positions": int, "margin_used": float, "margin_pct": float, "margin_available": float}
     """
     pf = st.session_state.portfolio
     margin_used = 0.0
+    short_positions = 0
     
     # Margin requirement: 50% de la valeur pour shorting
     for _, pos in pf.items():
         if pos.get("side") == "short":
+            short_positions += 1
             multiplier = pos.get("multiplier", 1)
             margin_used += pos["qty"] * pos["avg_price"] * multiplier * 0.5
     
     initial_margin = 100_000.0  # Capital initial approximatif
     margin_available = initial_margin - margin_used
-    margin_utilization_pct = (margin_used / initial_margin * 100) if initial_margin > 0 else 0.0
+    margin_pct = (margin_used / initial_margin * 100) if initial_margin > 0 else 0.0
     
     return {
+        "positions": short_positions,
         "margin_used": margin_used,
+        "margin_pct": margin_pct,
         "margin_available": max(margin_available, 0.0),
-        "margin_utilization_pct": margin_utilization_pct,
     }
